@@ -169,27 +169,41 @@ def book_ticket():
         date = request.form['date']
         time = request.form['time']
         show_id = request.form['venue']
-        
-        num_tickets = request.form['num_tickets']
+        num_tickets = int(request.form['num_tickets'])
 
-        show=Show.query.get(show_id)
-        num_tickets=int(num_tickets)
-        if int(show.venue.Capacity)<num_tickets:
+        show = Show.query.get(show_id)
+
+        # Check availability first
+        if int(show.venue.Capacity) < num_tickets:
             return "HouseFull"
-        show.venue.Capacity=str(int(show.venue.Capacity)-num_tickets)
 
-        
+        try:
+            # Create ticket
+            ticket = Ticket(
+                name=name,
+                date=date,
+                time=time,
+                venuename=show.venue.Venue,
+                showname=show.name,
+                num_tickets=num_tickets
+            )
+            db.session.add(ticket)
 
-        ticket = Ticket(name=name, date=date, time=time,venuename=show.venue.Venue,showname=show.name, num_tickets=num_tickets)
-        db.session.add(ticket)
-        db.session.commit()
+            # Deduct tickets
+            show.venue.Capacity = str(int(show.venue.Capacity) - num_tickets)
+
+            # Commit both changes together
+            db.session.commit()
+
+        except Exception as e:
+            db.session.rollback()
+            return f"Error while booking: {e}"
 
         return render_template('confirmation.html', ticket=ticket)
 
     venues = Venue.query.all()
     shows = Show.query.all()
-    return render_template('book_ticket.html',venues=venues,shows=shows)
-
+    return render_template('book_ticket.html', venues=venues, shows=shows)
 
 
 class Venue(db.Model):
